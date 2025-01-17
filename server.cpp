@@ -100,10 +100,29 @@ private:
     }
 
     void updatePlayerScore(Player& player) {
+        if (!player.alive) return;
+
         time_t now = time(nullptr);
-        // 每秒增加存活分数
-        player.score += (now - player.lastScoreTime) * SCORE_SURVIVAL_TIME;
-        player.lastScoreTime = now;
+        int timeDiff = static_cast<int>(now - player.lastScoreTime);
+        
+        #ifdef DEBUG_MODE
+        std::cout << "Updating score for player " << player.playerIndex + 1 
+                  << " time diff: " << timeDiff 
+                  << " last score time: " << player.lastScoreTime 
+                  << " current time: " << now << std::endl;
+        #endif
+
+        if (timeDiff > 0) {
+            int scoreIncrease = timeDiff * SCORE_SURVIVAL_TIME;
+            player.score += scoreIncrease;
+            player.lastScoreTime = now;
+
+            #ifdef DEBUG_MODE
+            std::cout << "Player " << player.playerIndex + 1 
+                      << " score increased by " << scoreIncrease 
+                      << " new score: " << player.score << std::endl;
+            #endif
+        }
     }
 
     void resetGame() {
@@ -142,26 +161,23 @@ private:
         }
     }
 
-    bool checkCollision(int x, int y, const Player& player) {
+    bool checkCollision(int x, int y, const Player& player, Player** killer) {
+        // 检查边界碰撞
         if (x < 0 || x >= BOARD_WIDTH || y < 0 || y >= BOARD_HEIGHT) {
-            handlePlayerDeath(const_cast<Player&>(player));
             return true;
         }
         
-        // 检查是否与其他玩家或轨迹相撞
+        // 检查与其他玩家或轨迹的碰撞
         if (board[y][x] != 0) {
-            // 找到击杀者
-            for (auto& other : players) {
-                if (board[y][x] == other.playerIndex + 1) {  // +1 因为显示从1开始
-                    // 将死亡玩家的分数转移给击杀者
-                    handlePlayerDeath(const_cast<Player&>(player), &other);
-                    return true;
-                }
+            // 找出击杀者
+            int killerIndex = board[y][x] - 1;  // 转换为玩家索引
+            if (killerIndex >= 0 && killerIndex < players.size() && 
+                killerIndex != player.playerIndex) {
+                *killer = &players[killerIndex];
             }
-            // 如果撞到墙或自己的轨迹
-            handlePlayerDeath(const_cast<Player&>(player));
             return true;
         }
+        
         return false;
     }
 
@@ -175,8 +191,10 @@ private:
         
         // 添加玩家信息
         state += "PLAYERS\n";
-        for (const auto& player : players) {
-            state += std::to_string(player.playerIndex) + "," +
+        for (size_t i = 0; i < players.size(); ++i) {
+            const auto& player = players[i];
+            state += std::to_string(i) + ":" +  // 添加玩家索引标识符
+                    std::to_string(player.playerIndex) + "," +
                     std::to_string(player.score) + "," +
                     std::to_string(player.highScore) + "," +
                     std::to_string(player.alive) + "," +
@@ -184,6 +202,12 @@ private:
                     std::to_string(player.y) + "," +
                     std::to_string(player.dx) + "," +
                     std::to_string(player.dy) + "\n";
+            
+            #ifdef DEBUG_MODE
+            std::cout << "序列化玩家 " << player.playerIndex 
+                     << " 位置:(" << player.x << "," << player.y 
+                     << ") 方向:(" << player.dx << "," << player.dy << ")" << std::endl;
+            #endif
         }
         
         state += "BOARD\n";
@@ -204,17 +228,21 @@ private:
             auto [x, y] = getRandomSafePosition();
             auto [dx, dy] = getRandomDirection();
             
+            clearPlayerTrail(player.playerIndex);
+            
             player.x = x;
             player.y = y;
             player.dx = dx;
             player.dy = dy;
             player.alive = true;
-            player.lastScoreTime = time(nullptr);
+            player.score = 0;  // 确保复活时分数从0开始
+            player.lastScoreTime = time(nullptr);  // 重置计时器
             board[y][x] = player.playerIndex + 1;
 
             #ifdef DEBUG_MODE
-            std::cout << "Respawning player " << player.playerIndex + 1 
-                      << " at position (" << x << "," << y << ")" << std::endl;
+            std::cout << "Player " << player.playerIndex + 1 
+                      << " respawned at position (" << x << "," << y 
+                      << ") with reset score" << std::endl;
             #endif
         } catch (const std::runtime_error& e) {
             std::cerr << "Error respawning player " << player.playerIndex + 1 
@@ -234,31 +262,53 @@ private:
     }
 
     // 新增：单个玩家死亡处理
-    void handlePlayerDeath(Player& player, Player* killer = nullptr) {  // 移除 const
-        player.alive = false;
-        
+    void handlePlayerDeath(Player& player, Player* killer, const std::string& cause) {
+        if (!player.alive) return;
+
+        // 先计算当前分数以确保包含所有存活时间
+        updatePlayerScore(player);
+        int finalScore = player.score;
+
         // 更新最高分记录
-        if (player.score > player.highScore) {
-            player.highScore = player.score;
-            highScores[player.socket] = player.score;
+        if (finalScore > player.highScore) {
+            player.highScore = finalScore;
+            highScores[player.socket] = finalScore;
             saveHighScores();
         }
 
-        // 如果是被其他玩家杀死的，将分数转移给击杀者
-        if (killer != nullptr) {
-            killer->score += player.score + SCORE_KILL_POINTS;
+        // 处理击杀奖励
+        if (killer != nullptr && killer != &player && killer->alive) {
+            // 基础击杀分数 + 被击杀者分数的一定比例
+            int scoreTransfer = SCORE_KILL_POINTS + 
+                              static_cast<int>(finalScore * SCORE_TRANSFER_RATE);
+            killer->score += scoreTransfer;
+            
             std::cout << "Player " << killer->playerIndex + 1 
                      << " killed Player " << player.playerIndex + 1 
-                     << " and got " << (player.score + SCORE_KILL_POINTS) << " points" << std::endl;
+                     << " [得分:" << scoreTransfer << " = " 
+                     << SCORE_KILL_POINTS << " + " 
+                     << static_cast<int>(finalScore * SCORE_TRANSFER_RATE) 
+                     << "(" << (SCORE_TRANSFER_RATE * 100) << "% of " << finalScore 
+                     << ")]" << std::endl;
+        } else {
+            std::cout << "Player " << player.playerIndex + 1 
+                     << " died by " << cause 
+                     << " with score " << finalScore << std::endl;
         }
 
-        // 清空死亡玩家的分数
+        // 标记玩家死亡并重置分数
+        player.alive = false;
         player.score = 0;
         player.lastScoreTime = time(nullptr);
         
         // 清理轨迹
         clearPlayerTrail(player.playerIndex);
-        std::cout << "Player " << player.playerIndex + 1 << " died" << std::endl;
+
+        // 立即向所有玩家发送更新后的游戏状态
+        std::string state = serializeGameState();
+        for (const auto& p : players) {
+            send(p.socket, state.c_str(), state.length(), 0);
+        }
     }
 
 public:
@@ -276,19 +326,22 @@ public:
                 auto [x, y] = getRandomSafePosition();
                 auto [dx, dy] = getRandomDirection();
                 
-                int playerIndex = players.size();  // 修改为从0开始
+                int playerIndex = players.size();
                 Player p = {x, y, dx, dy, true, socket, playerIndex,
                           0, highScores[socket], time(nullptr)};
                 players.push_back(p);
-                board[p.y][p.x] = playerIndex + 1;  // 显示时仍从1开始
+                board[p.y][p.x] = playerIndex + 1;
                 
-                // 发送确认消息
+                // 发送玩家索引信息
+                std::string indexMsg = "INDEX:" + std::to_string(playerIndex) + "\n";
+                send(socket, indexMsg.c_str(), indexMsg.length(), 0);
+                
+                // 发送欢迎消息
                 std::string welcomeMsg = "Welcome to TRON!\n";
                 send(socket, welcomeMsg.c_str(), welcomeMsg.length(), 0);
                 
-                // 立即发送初始游戏状态
+                // 发送初始游戏状态
                 std::string state = serializeGameState();
-                std::cout << "Sending initial state to new player (" << state.length() << " bytes)" << std::endl;
                 if (send(socket, state.c_str(), state.length(), 0) <= 0) {
                     std::cerr << "Failed to send initial state to player" << std::endl;
                     close(socket);
@@ -375,58 +428,83 @@ public:
         if (!gameRunning) return;
         std::lock_guard<std::mutex> lock(gameMutex);
 
-        static std::map<int, time_t> deathTimes;  // 记录每个玩家的死亡时间
+        static std::map<int, time_t> deathTimes;
+        bool stateChanged = false;
 
-        // 更新玩家状态
+        // 更新每个存活玩家的分数
         for (auto& player : players) {
             if (player.alive) {
                 updatePlayerScore(player);
-                
+            }
+        }
+
+        // 更新所有玩家的位置
+        for (auto& player : players) {
+            if (player.alive) {
                 int newX = player.x + player.dx;
                 int newY = player.y + player.dy;
 
-                if (checkCollision(newX, newY, player)) {
-                    handlePlayerDeath(player);
-                    deathTimes[player.playerIndex] = time(nullptr);
+                #ifdef DEBUG_MODE
+                std::cout << "Moving player " << player.playerIndex + 1 
+                          << " from (" << player.x << "," << player.y 
+                          << ") to (" << newX << "," << newY << ")" << std::endl;
+                #endif
+
+                Player* killer = nullptr;
+                bool willCollide = checkCollision(newX, newY, player, &killer);
+                board[player.y][player.x] = player.playerIndex + 1;
+
+                if (willCollide) {
+                    handlePlayerDeath(player, killer, killer ? "被击杀" : "碰撞");
+                    stateChanged = true;
                     continue;
                 }
 
-                board[player.y][player.x] = player.playerIndex + 1;
                 player.x = newX;
                 player.y = newY;
-                board[newY][newX] = player.playerIndex + 1;
+                board[player.y][player.x] = player.playerIndex + 1;
+                stateChanged = true;
             } else {
-                // 检查是否应该复活
+                // 处理死亡玩家复活
+                time_t now = time(nullptr);
                 auto it = deathTimes.find(player.playerIndex);
-                if (it != deathTimes.end()) {
-                    time_t now = time(nullptr);
-                    if (now - it->second >= RESPAWN_DELAY) {
-                        try {
-                            auto [x, y] = getRandomSafePosition();
-                            auto [dx, dy] = getRandomDirection();
-                            player.x = x;
-                            player.y = y;
-                            player.dx = dx;
-                            player.dy = dy;
-                            player.alive = true;
-                            player.lastScoreTime = now;
-                            board[y][x] = player.playerIndex + 1;
-                            deathTimes.erase(it);  // 移除死亡时间记录
-                            std::cout << "Player " << player.playerIndex + 1 << " respawned" << std::endl;
-                        } catch (const std::runtime_error& e) {
-                            std::cerr << "Failed to respawn player " << player.playerIndex + 1 
-                                    << ": " << e.what() << std::endl;
-                        }
-                    }
+                if (it == deathTimes.end()) {
+                    deathTimes[player.playerIndex] = now;
+                } else if (now - it->second >= RESPAWN_DELAY) {
+                    respawnPlayer(player);
+                    deathTimes.erase(it);
+                    stateChanged = true;
                 }
             }
         }
 
-        // 发送状态
-        std::string state = serializeGameState();
-        for (const auto& player : players) {
-            if (send(player.socket, state.c_str(), state.length(), 0) < 0) {
-                std::cerr << "Failed to send state to player " << player.playerIndex + 1 << std::endl;
+        // 如果游戏状态发生变化，发送更新
+        if (stateChanged) {
+            std::string state = serializeGameState();
+            std::vector<int> failedPlayers;
+            
+            #ifdef DEBUG_MODE
+            std::cout << "Game state updated. Active players: ";
+            for (const auto& player : players) {
+                std::cout << "Player " << player.playerIndex + 1 
+                          << "(" << (player.alive ? "alive" : "dead") 
+                          << " at " << player.x << "," << player.y 
+                          << " moving " << player.dx << "," << player.dy 
+                          << ") ";
+            }
+            std::cout << std::endl;
+            #endif
+
+            // 发送状态给所有玩家
+            for (const auto& player : players) {
+                if (send(player.socket, state.c_str(), state.length(), 0) < 0) {
+                    failedPlayers.push_back(player.playerIndex);
+                }
+            }
+            
+            // 清理断开连接的玩家
+            for (int index : failedPlayers) {
+                removePlayer(index);
             }
         }
     }

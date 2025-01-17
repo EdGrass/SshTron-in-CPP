@@ -15,7 +15,7 @@
 // 网络设置
 #define SERVER_PORT 8888
 #define SERVER_IP "127.0.0.1"
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 4096
 
 // 添加网络传输相关定义
 #define STATE_START "STATE\n"
@@ -25,13 +25,13 @@
 // 网络相关定义
 #define RECONNECT_ATTEMPTS 3
 #define RECONNECT_DELAY 1000000  // 1秒 (微秒)
-#define SOCKET_TIMEOUT 5         // 5秒
+#define SOCKET_TIMEOUT 10         // 10秒
 #define SELECT_TIMEOUT_MS 100    // select超时（毫秒）
 
 // 1. 添加缺失的网络配置
 #define MAX_PENDING_CONNECTIONS 5
 #define HEARTBEAT_INTERVAL 1     // 秒
-#define MAX_DATA_BUFFER 8192     // 最大数据缓冲区大小
+#define MAX_DATA_BUFFER 16384     // 最大数据缓冲区大小
 
 // 游戏控制
 #define GAME_SPEED_MS 1000       // 游戏刷新间隔（毫秒）
@@ -104,8 +104,8 @@
 #define ERROR_TIMEOUT -3
 
 // 游戏界面相关定义
-#define GAME_TITLE L"TRON 光域争霸战"
-#define GAME_HEADER_FORMAT "Score: %d : Your High Score: %d : Game High Score: %d"
+#define GAME_TITLE L"SSH TRON but with C++"
+#define GAME_HEADER_FORMAT "Score:%d | Your High Score:%d | Game High Score:%d "
 #define GAME_FOOTER "Warning: Other Players Must be in This Game for You to Score!"
 #define PLAYER_NAME_MAX_LENGTH 20
 
