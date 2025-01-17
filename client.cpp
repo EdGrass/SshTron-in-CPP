@@ -87,7 +87,6 @@ std::string addBorder(const std::string& boardStr) {
     // 分割输入字符串为行
     std::stringstream ss(boardStr);
     std::string line;
-    size_t dataStart = 0;  // 重命名为更合适的名字
 
     // 获取第一行（分数行）
     if (std::getline(ss, line)) {
@@ -184,7 +183,8 @@ std::string addBorder(const std::string& boardStr) {
 }
 
 struct PlayerState {
-    int index;
+    int playerIndex;
+    int colorIndex;  // 添加颜色索引
     int score;
     int highScore;
     bool alive;
@@ -192,12 +192,13 @@ struct PlayerState {
 
 class GameDisplay {
 private:
-    bool gameRunning;
     std::vector<PlayerState> players;
     std::map<int, std::tuple<int, int, int, int>> playerPositions;  // 新增：存储玩家位置和方向
     std::vector<std::vector<int>> board;
     const std::string playerColors[4] = {PLAYER_COLORS};
     int myPlayerIndex = -1;  // 添加玩家索引
+    int myColorIndex = -1;  // 添加颜色索引
+    int socket;  // 添加 socket 成员变量
     
     std::string getTrailSymbol(int playerIndex, int x, int y) {
         bool up = (y > 0 && board[y-1][x] == playerIndex);
@@ -225,38 +226,42 @@ private:
     }
 
     // 修改玩家头部位置检查函数
-    bool isPlayerHead(int x, int y, int playerIndex) {
-        auto it = playerPositions.find(playerIndex);
+    bool isPlayerHead(int x, int y, int colorIndex) {
+        auto it = playerPositions.find(colorIndex);
         if (it != playerPositions.end()) {
             auto [px, py, _, __] = it->second;
-            return (x == px && y == py);  // 简化判断逻辑
+            return (x == px && y == py);
         }
         return false;
     }
 
 public:
     // 修复初始化列表的顺序，使其与成员声明顺序一致
-    GameDisplay() : 
-        gameRunning(false),
+    GameDisplay(int sock) : 
         players(),
         playerPositions(),
-        board(BOARD_HEIGHT, std::vector<int>(BOARD_WIDTH, 0)) {}
+        board(BOARD_HEIGHT, std::vector<int>(BOARD_WIDTH, 0)),
+        socket(sock) {}
+
+    void setMyIndices(int pIndex, int cIndex) {
+        myPlayerIndex = pIndex;
+        myColorIndex = cIndex;
+        #ifdef DEBUG_MODE
+        std::cout << "Set indices - player: " << pIndex << ", color: " << cIndex << std::endl;
+        #endif
+    }
 
     // 修改 updateState 方法中的分数处理部分
     void updateState(const std::string& stateStr) {
         try {
-            #ifdef DEBUG_MODE
-            std::cout << "开始解析游戏状态..." << std::endl;
-            #endif
-
-            players.clear();  // 清空当前玩家状态
+            players.clear();
             playerPositions.clear();
+            board = std::vector<std::vector<int>>(BOARD_HEIGHT, std::vector<int>(BOARD_WIDTH, 0));
             
             std::stringstream ss(stateStr);
             std::string line;
             bool foundPlayers = false;
             
-            // 寻找玩家数据段
             while (std::getline(ss, line)) {
                 if (line == "PLAYERS") {
                     foundPlayers = true;
@@ -264,57 +269,45 @@ public:
                 }
             }
             
-            if (!foundPlayers) {
-                std::cerr << "Error: Player section not found" << std::endl;
-                return;
-            }
+            if (!foundPlayers) return;
 
             // 解析玩家数据
             while (std::getline(ss, line) && line != "BOARD") {
                 if (line.empty()) continue;
                 
                 std::stringstream playerStream(line);
-                std::string indexStr, data;
-                if (std::getline(playerStream, indexStr, ':') && 
-                    std::getline(playerStream, data)) {
-                    
-                    std::stringstream dataStream(data);
-                    std::string value;
-                    std::vector<int> values;
-                    
-                    while (std::getline(dataStream, value, ',')) {
-                        if (!value.empty()) {
-                            try {
-                                values.push_back(std::stoi(value));
-                            } catch (const std::exception& e) {
-                                std::cerr << "Error parsing value: " << value << std::endl;
-                                continue;
-                            }
-                        }
+                std::string colorStr;
+                std::getline(playerStream, colorStr, ':');
+                
+                int colorIndex = std::stoi(colorStr);
+                
+                std::string data;
+                std::getline(playerStream, data);
+                std::stringstream dataStream(data);
+                std::string value;
+                std::vector<int> values;
+                
+                while (std::getline(dataStream, value, ',')) {
+                    if (!value.empty()) {
+                        values.push_back(std::stoi(value));
                     }
+                }
+                
+                if (values.size() >= 8) {
+                    PlayerState p;
+                    p.colorIndex = colorIndex;  // 使用从服务器接收的颜色索引
+                    p.playerIndex = values[0];
+                    p.score = values[1];
+                    p.highScore = values[2];
+                    p.alive = values[3] != 0;
                     
-                    if (values.size() >= 8) {
-                        PlayerState p;
-                        p.index = values[0];
-                        p.score = values[1];
-                        p.highScore = values[2];
-                        p.alive = values[3];
-                        
-                        players.push_back(p);
-                        
-                        #ifdef DEBUG_MODE
-                        std::cout << "Player " << p.index + 1 
-                                 << " Score: " << p.score 
-                                 << " High Score: " << p.highScore 
-                                 << " Alive: " << p.alive << std::endl;
-                        #endif
-                        
-                        // 存储位置信息
-                        playerPositions[p.index] = std::make_tuple(
-                            values[4], values[5],  // x, y
-                            values[6], values[7]   // dx, dy
-                        );
-                    }
+                    players.push_back(p);
+                    
+                    // 更新位置信息
+                    playerPositions[colorIndex] = std::make_tuple(
+                        values[4], values[5],  // x, y
+                        values[6], values[7]   // dx, dy
+                    );
                 }
             }
 
@@ -329,24 +322,14 @@ public:
                 
                 while (std::getline(ls, value, ',') && col < BOARD_WIDTH) {
                     if (!value.empty()) {
-                        try {
-                            board[row][col] = std::stoi(value);
-                        } catch (const std::exception& e) {
-                            std::cerr << "解析游戏板错误: " << value << std::endl;
-                            board[row][col] = 0;
-                        }
+                        board[row][col] = std::stoi(value);
                     }
                     col++;
                 }
                 row++;
             }
-            
-            #ifdef DEBUG_MODE
-            std::cout << "状态更新完成" << std::endl;
-            #endif
-            
         } catch (const std::exception& e) {
-            std::cerr << "更新状态时发生错误: " << e.what() << std::endl;
+            std::cerr << "Error updating state: " << e.what() << std::endl;
         }
     }
 
@@ -361,7 +344,7 @@ public:
         std::string display;
         char scoreBuffer[100];  // 为分数信息创建缓冲区
         
-        // 只显示当前玩家的分数信息
+        // 使用颜色索引查找当前玩家
         const PlayerState* currentPlayer = nullptr;
         int maxScore = 0;
         
@@ -369,7 +352,8 @@ public:
             if (player.highScore > maxScore) {
                 maxScore = player.highScore;
             }
-            if (player.index == myPlayerIndex) {
+            // 使用颜色索引而不是玩家索引来标识当前玩家
+            if (player.colorIndex == myColorIndex) {
                 currentPlayer = &player;
             }
         }
@@ -383,19 +367,21 @@ public:
         // 渲染游戏板
         for (size_t y = 0; y < board.size(); ++y) {
             for (size_t x = 0; x < board[y].size(); ++x) {
-                int playerIndex = board[y][x];
-                if (playerIndex > 0) {
-                    display += playerColors[playerIndex - 1];
-                    if (isPlayerHead(x, y, playerIndex)) {
-                        auto it = playerPositions.find(playerIndex);
-                        if (it != playerPositions.end()) {
-                            auto [_, __, dx, dy] = it->second;
-                            display += getDirectionSymbol(dx, dy);
+                int colorIndex = board[y][x] - 1;  // 转换为0基索引
+                if (colorIndex >= 0) {
+                    if (colorIndex < MAX_PLAYERS) {
+                        display += playerColors[colorIndex];
+                        if (isPlayerHead(x, y, colorIndex)) {
+                            auto it = playerPositions.find(colorIndex);
+                            if (it != playerPositions.end()) {
+                                auto [_, __, dx, dy] = it->second;
+                                display += getDirectionSymbol(dx, dy);
+                            }
+                        } else {
+                            display += getTrailSymbol(colorIndex + 1, x, y);
                         }
-                    } else {
-                        display += getTrailSymbol(playerIndex, x, y);
+                        display += COLOR_RESET;
                     }
-                    display += COLOR_RESET;
                 } else {
                     display += " ";
                 }
@@ -408,12 +394,17 @@ public:
         
         return display;
     }
+
+    void handleInput(char input) {
+        // 使用类成员变量 socket
+        send(socket, &input, 1, 0);
+    }
 }; // 2. 添加缺失的分号
 
 // 修改 receiveGameState 函数，添加调试输出
 void receiveGameState(int sock) {
     char buffer[BUFFER_SIZE];
-    GameDisplay display;
+    GameDisplay display(sock);  // 传入 socket
     std::string accumulatedData;
     time_t lastHeartbeat = time(nullptr);
     
@@ -466,11 +457,17 @@ void receiveGameState(int sock) {
                 
                 // 检查是否是玩家索引信息
                 if (data.find("INDEX:") == 0) {
-                    int index = std::stoi(data.substr(6));
-                    display.setMyPlayerIndex(index);
-                    #ifdef DEBUG_MODE
-                    std::cout << "Received player index: " << index << std::endl;
-                    #endif
+                    size_t comma = data.find(",", 6);
+                    if (comma != std::string::npos) {
+                        int playerIndex = std::stoi(data.substr(6, comma - 6));
+                        int colorIndex = std::stoi(data.substr(comma + 1));
+                        display.setMyIndices(playerIndex, colorIndex);
+                        
+                        #ifdef DEBUG_MODE
+                        std::cout << "Received indices - player:" << playerIndex 
+                                 << " color:" << colorIndex << std::endl;
+                        #endif
+                    }
                     continue;
                 }
                 

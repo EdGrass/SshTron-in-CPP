@@ -25,6 +25,7 @@ struct Player {
     int score;
     int highScore;
     time_t lastScoreTime;
+    int colorIndex;  // 添加颜色索引
 };
 
 class TronGame {
@@ -34,6 +35,16 @@ private:
     std::mutex gameMutex;
     bool gameRunning;
     std::map<int, int> highScores;
+    std::vector<bool> usedPlayerIndices;  // 新增：跟踪已使用的玩家索引
+    std::vector<bool> usedColorIndices;  // 跟踪已使用的颜色索引
+    std::map<int, int> socketToHighScores;  // 新增：存储每个socket的最高分
+
+    struct PlayerScore {
+        int current;
+        int high;
+        int colorIndex;  // 添加颜色索引关联
+    };
+    std::map<int, PlayerScore> playerScores;  // socket -> PlayerScore
 
     // 检查位置是否安全
     bool isSafePosition(int x, int y) {
@@ -88,14 +99,14 @@ private:
         std::ifstream file(HIGH_SCORE_FILE);
         int socket, score;
         while (file >> socket >> score) {
-            highScores[socket] = score;
+            socketToHighScores[socket] = score;
         }
     }
 
     void saveHighScores() {
         std::ofstream file(HIGH_SCORE_FILE);
-        for (const auto& score : highScores) {
-            file << score.first << " " << score.second << std::endl;
+        for (const auto& [socket, score] : playerScores) {
+            file << socket << " " << score.high << " " << score.colorIndex << std::endl;
         }
     }
 
@@ -153,7 +164,7 @@ private:
                 player.alive = true;
                 player.score = 0;  // 重置分数
                 player.lastScoreTime = time(nullptr);
-                board[y][x] = player.playerIndex + 1;
+                board[y][x] = player.colorIndex + 1;  // 使用颜色索引而不是玩家索引
             } catch (const std::runtime_error& e) {
                 std::cerr << "Error resetting player " << player.playerIndex + 1 
                          << ": " << e.what() << std::endl;
@@ -169,19 +180,23 @@ private:
         
         // 检查与其他玩家或轨迹的碰撞
         if (board[y][x] != 0) {
-            // 找出击杀者
-            int killerIndex = board[y][x] - 1;  // 转换为玩家索引
-            if (killerIndex >= 0 && killerIndex < players.size() && 
-                killerIndex != player.playerIndex) {
-                *killer = &players[killerIndex];
+            int killerColorIndex = board[y][x] - 1;  // 获取颜色索引
+            if (killerColorIndex == player.colorIndex) {
+                return false;  // 不与自己的轨迹碰撞
+            }
+            // 根据颜色索引查找击杀者
+            for (auto& p : players) {
+                if (p.colorIndex == killerColorIndex) {
+                    *killer = &p;
+                    break;
+                }
             }
             return true;
         }
-        
         return false;
     }
 
-    // 修改序列化格式，添加校验和同步标记
+    // 修改序列化格式，添加颜色索引信息
     std::string serializeGameState() {
         std::string state;
         state += "BEGIN\n";  // 添加开始标记
@@ -191,9 +206,8 @@ private:
         
         // 添加玩家信息
         state += "PLAYERS\n";
-        for (size_t i = 0; i < players.size(); ++i) {
-            const auto& player = players[i];
-            state += std::to_string(i) + ":" +  // 添加玩家索引标识符
+        for (const auto& player : players) {
+            state += std::to_string(player.colorIndex) + ":" +  // 使用颜色索引作为主键
                     std::to_string(player.playerIndex) + "," +
                     std::to_string(player.score) + "," +
                     std::to_string(player.highScore) + "," +
@@ -202,12 +216,6 @@ private:
                     std::to_string(player.y) + "," +
                     std::to_string(player.dx) + "," +
                     std::to_string(player.dy) + "\n";
-            
-            #ifdef DEBUG_MODE
-            std::cout << "序列化玩家 " << player.playerIndex 
-                     << " 位置:(" << player.x << "," << player.y 
-                     << ") 方向:(" << player.dx << "," << player.dy << ")" << std::endl;
-            #endif
         }
         
         state += "BOARD\n";
@@ -228,7 +236,7 @@ private:
             auto [x, y] = getRandomSafePosition();
             auto [dx, dy] = getRandomDirection();
             
-            clearPlayerTrail(player.playerIndex);
+            clearPlayerTrail(player.colorIndex);  // 修改：使用颜色索引
             
             player.x = x;
             player.y = y;
@@ -236,13 +244,12 @@ private:
             player.dy = dy;
             player.alive = true;
             player.score = 0;  // 确保复活时分数从0开始
-            player.lastScoreTime = time(nullptr);  // 重置计时器
-            board[y][x] = player.playerIndex + 1;
+            board[y][x] = player.colorIndex + 1;  // 使用颜色索引
 
             #ifdef DEBUG_MODE
             std::cout << "Player " << player.playerIndex + 1 
-                      << " respawned at position (" << x << "," << y 
-                      << ") with reset score" << std::endl;
+                      << " (color: " << player.colorIndex + 1 
+                      << ") respawned at position (" << x << "," << y << ")" << std::endl;
             #endif
         } catch (const std::runtime_error& e) {
             std::cerr << "Error respawning player " << player.playerIndex + 1 
@@ -251,10 +258,10 @@ private:
     }
 
     // 修改：只清理单个玩家的轨迹
-    void clearPlayerTrail(int playerIndex) {
+    void clearPlayerTrail(int colorIndex) {  // 修改：使用颜色索引而不是玩家索引
         for (auto& row : board) {
             for (auto& cell : row) {
-                if (cell == playerIndex + 1) {  // +1是因为玩家索引从0开始，但显示从1开始
+                if (cell == colorIndex + 1) {  // 使用颜色索引
                     cell = 0;
                 }
             }
@@ -301,8 +308,8 @@ private:
         player.score = 0;
         player.lastScoreTime = time(nullptr);
         
-        // 清理轨迹
-        clearPlayerTrail(player.playerIndex);
+        // 清理轨迹时使用颜色索引
+        clearPlayerTrail(player.colorIndex);
 
         // 立即向所有玩家发送更新后的游戏状态
         std::string state = serializeGameState();
@@ -311,12 +318,74 @@ private:
         }
     }
 
+    // 新增：找到最小可用的玩家索引
+    int findAvailablePlayerIndex() {
+        std::vector<bool> used(MAX_PLAYERS, false);
+        for (const auto& player : players) {
+            if (player.playerIndex < MAX_PLAYERS) {
+                used[player.playerIndex] = true;
+            }
+        }
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (!used[i]) return i;
+        }
+        return -1;
+    }
+
+    // 新增：找到可用的颜色索引
+    int findAvailableColorIndex() {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (!usedColorIndices[i]) {
+                usedColorIndices[i] = true;  // 标记为已使用
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    // 新增：占用一个颜色索引
+    void occupyColorIndex(int colorIndex) {
+        if (colorIndex >= 0 && colorIndex < MAX_PLAYERS) {
+            usedColorIndices[colorIndex] = true;
+        }
+    }
+
+    // 修改：在现有代码中添加日志
+    void debugPrintState() {
+        #ifdef DEBUG_MODE
+        std::cout << "\nCurrent game state:" << std::endl;
+        std::cout << "Used color indices: ";
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            std::cout << i << ":" << (usedColorIndices[i] ? "1" : "0") << " ";
+        }
+        std::cout << "\nPlayers:" << std::endl;
+        for (const auto& p : players) {
+            std::cout << "Player " << p.playerIndex 
+                     << " (color:" << p.colorIndex 
+                     << ", socket:" << p.socket
+                     << ", score:" << p.score 
+                     << ")" << std::endl;
+        }
+        std::cout << std::endl;
+        #endif
+    }
+
+    void initializeNewPlayer(Player& p) {
+        PlayerScore score = {0, 0, p.colorIndex};
+        if (playerScores.find(p.socket) != playerScores.end()) {
+            // 如果是重连的玩家，重置当前分数但保留最高分
+            score.high = playerScores[p.socket].high;
+        }
+        playerScores[p.socket] = score;
+    }
+
 public:
     TronGame() {
         board = std::vector<std::vector<int>>(BOARD_HEIGHT, 
                 std::vector<int>(BOARD_WIDTH, 0));
         gameRunning = true;
         loadHighScores();
+        usedColorIndices = std::vector<bool>(MAX_PLAYERS, false);  // 初始化颜色使用状态
     }
 
     void addPlayer(int socket) {
@@ -326,16 +395,48 @@ public:
                 auto [x, y] = getRandomSafePosition();
                 auto [dx, dy] = getRandomDirection();
                 
-                int playerIndex = players.size();
+                // 查找最小可用的颜色索引
+                int colorIndex = -1;
+                for (int i = 0; i < MAX_PLAYERS; i++) {
+                    if (!usedColorIndices[i]) {
+                        colorIndex = i;
+                        break;
+                    }
+                }
+                
+                int playerIndex = findAvailablePlayerIndex();
+                
+                if (playerIndex < 0 || colorIndex < 0) {
+                    std::cerr << "No available slots" << std::endl;
+                    close(socket);
+                    return;
+                }
+
+                usedColorIndices[colorIndex] = true;
+
                 Player p = {x, y, dx, dy, true, socket, playerIndex,
-                          0, highScores[socket], time(nullptr)};
-                players.push_back(p);
-                board[p.y][p.x] = playerIndex + 1;
-                
-                // 发送玩家索引信息
-                std::string indexMsg = "INDEX:" + std::to_string(playerIndex) + "\n";
+                          0, socketToHighScores[socket], time(nullptr)};
+                p.colorIndex = colorIndex;
+
+                // 打印调试信息
+                #ifdef DEBUG_MODE
+                std::cout << "Adding new player - socket:" << socket 
+                         << " playerIndex:" << playerIndex 
+                         << " colorIndex:" << colorIndex << std::endl;
+                #endif
+
+                // 发送索引信息
+                std::string indexMsg = "INDEX:" + std::to_string(playerIndex) + 
+                                     "," + std::to_string(colorIndex) + "\n";
                 send(socket, indexMsg.c_str(), indexMsg.length(), 0);
-                
+
+                players.push_back(p);
+                board[y][x] = colorIndex + 1;
+
+                initializeNewPlayer(p);  // 初始化新玩家的分数
+
+                debugPrintState();
+
                 // 发送欢迎消息
                 std::string welcomeMsg = "Welcome to TRON!\n";
                 send(socket, welcomeMsg.c_str(), welcomeMsg.length(), 0);
@@ -356,15 +457,20 @@ public:
         }
     }
 
-    void handleInput(int playerIndex, char input) {
+    void handleInput(int colorIndex, char input) {  // 修改参数为 colorIndex
         std::lock_guard<std::mutex> lock(gameMutex);
-        if (playerIndex < 0 || playerIndex >= players.size()) return;
         
-        Player& player = players[playerIndex];
-        if (!player.alive) return;
+        // 使用颜色索引查找玩家
+        auto it = std::find_if(players.begin(), players.end(),
+            [colorIndex](const Player& p) { return p.colorIndex == colorIndex; });
+        
+        if (it == players.end() || !it->alive) return;
+        
+        Player& player = *it;
         
         #ifdef DEBUG_MODE
-        std::cout << "Received input from player " << playerIndex + 1 << ": " << input << std::endl;
+        std::cout << "Received input from player " << player.playerIndex + 1 
+                  << " (color:" << player.colorIndex << "): " << input << std::endl;
         #endif
         
         int newDx = player.dx;
@@ -381,7 +487,7 @@ public:
             player.dx = newDx;
             player.dy = newDy;
             #ifdef DEBUG_MODE
-            std::cout << "Player " << playerIndex + 1 
+            std::cout << "Player " << player.playerIndex + 1 
                       << " direction changed to: (" << player.dx << "," << player.dy << ")" << std::endl;
             #endif
         }
@@ -410,16 +516,44 @@ public:
 
     void removePlayer(int playerIndex) {
         std::lock_guard<std::mutex> lock(gameMutex);
-        if (playerIndex >= 0 && playerIndex < players.size()) {
-            // 清理玩家轨迹
-            for (auto& row : board) {
-                for (auto& cell : row) {
-                    if (cell == players[playerIndex].playerIndex) {
-                        cell = 0;
-                    }
+        auto it = std::find_if(players.begin(), players.end(),
+            [playerIndex](const Player& p) { return p.playerIndex == playerIndex; });
+        
+        if (it != players.end()) {
+            #ifdef DEBUG_MODE
+            std::cout << "Removing player - index:" << playerIndex 
+                     << " color:" << it->colorIndex << std::endl;
+            #endif
+
+            // 释放颜色索引
+            usedColorIndices[it->colorIndex] = false;
+            
+            // 保存分数
+            socketToHighScores[it->socket] = std::max(
+                socketToHighScores[it->socket], 
+                it->score
+            );
+            saveHighScores();
+
+            clearPlayerTrail(it->colorIndex);
+            players.erase(it);
+
+            debugPrintState();
+
+            // 立即发送更新后的游戏状态给所有剩余玩家
+            std::string state = serializeGameState();
+            std::vector<int> failedPlayers;
+            
+            for (const auto& p : players) {
+                if (send(p.socket, state.c_str(), state.length(), 0) < 0) {
+                    failedPlayers.push_back(p.playerIndex);
                 }
             }
-            players.erase(players.begin() + playerIndex);
+            
+            // 处理发送失败的玩家
+            for (int index : failedPlayers) {
+                removePlayer(index);
+            }
         }
     }
 
@@ -427,6 +561,19 @@ public:
     void updateGame() {
         if (!gameRunning) return;
         std::lock_guard<std::mutex> lock(gameMutex);
+
+        // 首先检查并清理已断开连接的玩家
+        std::vector<int> disconnectedPlayers;
+        for (const auto& player : players) {
+            int testSend = send(player.socket, "", 0, MSG_NOSIGNAL);
+            if (testSend < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+                disconnectedPlayers.push_back(player.playerIndex);
+            }
+        }
+
+        for (int index : disconnectedPlayers) {
+            removePlayer(index);
+        }
 
         static std::map<int, time_t> deathTimes;
         bool stateChanged = false;
@@ -452,7 +599,9 @@ public:
 
                 Player* killer = nullptr;
                 bool willCollide = checkCollision(newX, newY, player, &killer);
-                board[player.y][player.x] = player.playerIndex + 1;
+
+                // 在移动前标记当前位置为玩家的颜色
+                board[player.y][player.x] = player.colorIndex + 1;
 
                 if (willCollide) {
                     handlePlayerDeath(player, killer, killer ? "被击杀" : "碰撞");
@@ -460,9 +609,10 @@ public:
                     continue;
                 }
 
+                // 更新玩家位置并在新位置标记颜色
                 player.x = newX;
                 player.y = newY;
-                board[player.y][player.x] = player.playerIndex + 1;
+                board[player.y][player.x] = player.colorIndex + 1;
                 stateChanged = true;
             } else {
                 // 处理死亡玩家复活
@@ -498,7 +648,7 @@ public:
             // 发送状态给所有玩家
             for (const auto& player : players) {
                 if (send(player.socket, state.c_str(), state.length(), 0) < 0) {
-                    failedPlayers.push_back(player.playerIndex);
+                    failedPlayers.push_back(player.playerIndex);  // 修复：使用 player 而不是 p
                 }
             }
             
@@ -514,11 +664,32 @@ public:
         std::lock_guard<std::mutex> lock(gameMutex);
         resetGame();
     }
+
+    // 添加新方法来获取玩家的实际索引
+    int getPlayerIndexBySocket(int socket) {
+        for (const auto& player : players) {
+            if (player.socket == socket) {
+                return player.playerIndex;
+            }
+        }
+        return -1;
+    }
+
+    int getColorIndexBySocket(int socket) {
+        std::lock_guard<std::mutex> lock(gameMutex);
+        for (const auto& player : players) {
+            if (player.socket == socket) {
+                return player.colorIndex;
+            }
+        }
+        return -1;
+    }
 }; // 添加分号
 
 void handleClient(TronGame& game, int playerIndex) {
     char buffer[BUFFER_SIZE];
     int playerSocket = game.getPlayerSocket(playerIndex);
+    int colorIndex = game.getColorIndexBySocket(playerSocket);  // 获取颜色索引
     time_t lastHeartbeat = time(nullptr);
     bool connectionAlive = true;
     
@@ -532,6 +703,13 @@ void handleClient(TronGame& game, int playerIndex) {
         ioctl(playerSocket, FIONBIO, &flags);
     #endif
     
+    // 在连接开始时验证玩家索引
+    if (playerIndex < 0) {
+        std::cerr << "Invalid player index" << std::endl;
+        close(playerSocket);
+        return;
+    }
+
     while (connectionAlive) {
         fd_set readfds;
         FD_ZERO(&readfds);
@@ -573,7 +751,7 @@ void handleClient(TronGame& game, int playerIndex) {
                 continue;
             }
             
-            game.handleInput(playerIndex, buffer[0]);
+            game.handleInput(colorIndex, buffer[0]);  // 使用颜色索引
         }
     }
     
@@ -625,7 +803,17 @@ int main() {
             int clientSocket = accept(serverSocket, nullptr, nullptr);
             if (clientSocket >= 0) {
                 game.addPlayer(clientSocket);
-                clientThreads.emplace_back(handleClient, std::ref(game), game.getPlayerCount() - 1);
+                // 修改这里,使用玩家实际分配的索引而不是数量
+                int assignedIndex = -1;
+                for (size_t i = 0; i < game.getPlayerCount(); i++) {
+                    if (game.getPlayerSocket(i) == clientSocket) {
+                        assignedIndex = i;
+                        break;
+                    }
+                }
+                if (assignedIndex >= 0) {
+                    clientThreads.emplace_back(handleClient, std::ref(game), assignedIndex);
+                }
             }
         }
         

@@ -34,7 +34,7 @@
 #define MAX_DATA_BUFFER 16384     // 最大数据缓冲区大小
 
 // 游戏控制
-#define GAME_SPEED_MS 1000       // 游戏刷新间隔（毫秒）
+#define GAME_SPEED_MS 500       // 游戏刷新间隔（毫秒）
 #define RESET_DELAY_MS 3000     // 重置游戏延迟（毫秒）
 #define EMPTY_CELL ' '     // 空白区域字符
 
@@ -124,7 +124,7 @@
 #endif
 
 // 添加心跳包设置
-#define HEARTBEAT_INTERVAL_MS 1000  // 心跳间隔（毫秒）
+#define HEARTBEAT_INTERVAL_MS 300  // 心跳间隔（毫秒）
 #define CONNECTION_TIMEOUT_MS 5000  // 连接超时（毫秒）
 
 // 添加游戏状态同步设置
