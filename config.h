@@ -123,6 +123,19 @@
     #define DEBUG_LEVEL_ERROR 3
 #endif
 
+// 调试设置
+#ifdef DEBUG_MODE
+    // 调试级别定义
+    #define DEBUG_LEVEL_INFO    1
+    #define DEBUG_LEVEL_WARNING 2
+    #define DEBUG_LEVEL_ERROR   3
+    
+    // 调试输出格式
+    #define DEBUG_FORMAT        "[DEBUG] %s:%d: "
+    #define WARNING_FORMAT      "[WARNING] %s:%d: "
+    #define ERROR_FORMAT        "[ERROR] %s:%d: "
+#endif
+
 // 添加心跳包设置
 #define HEARTBEAT_INTERVAL_MS 300  // 心跳间隔（毫秒）
 #define CONNECTION_TIMEOUT_MS 5000  // 连接超时（毫秒）

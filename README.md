@@ -23,12 +23,6 @@ Here is a screenshot of my game running:
 	- `<termios.h>`: For handling terminal input.
 	- `<unistd.h>`: For file descriptor operations.
 
-## Compilation and Build
-Navigate to the project directory and compile using the following command:
-
-```bash
-make
-```
 
 ## Configuration
 1. Configure the server IP address and port number in `config.h`:
@@ -37,6 +31,14 @@ make
 	 #define SERVER_PORT 8080      // Server port
 	 ```
 2. Configure other parameters such as the maximum number of players, game board width, and height.
+
+
+## Compilation and Build
+Navigate to the project directory and compile using the following command:
+
+```bash
+make
+```
 
 ## Running the Game
 

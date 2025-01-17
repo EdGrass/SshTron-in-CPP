@@ -16,6 +16,13 @@
 #include <atomic>
 #include <fcntl.h>
 
+// 在文件开头添加调试输出宏定义
+#ifdef DEBUG_MODE
+#define DEBUG_LOG(msg, ...) printf("[DEBUG] " msg "\n", ##__VA_ARGS__)
+#else
+#define DEBUG_LOG(msg, ...)
+#endif
+
 void clearScreen() {
     std::cout << "\033[2J\033[H";
 }
@@ -246,9 +253,7 @@ public:
     void setMyIndices(int pIndex, int cIndex) {
         myPlayerIndex = pIndex;
         myColorIndex = cIndex;
-        #ifdef DEBUG_MODE
-        std::cout << "Set indices - player: " << pIndex << ", color: " << cIndex << std::endl;
-        #endif
+        DEBUG_LOG("Set indices - player: %d, color: %d", pIndex, cIndex);
     }
 
     // 修改 updateState 方法中的分数处理部分
@@ -463,10 +468,7 @@ void receiveGameState(int sock) {
                         int colorIndex = std::stoi(data.substr(comma + 1));
                         display.setMyIndices(playerIndex, colorIndex);
                         
-                        #ifdef DEBUG_MODE
-                        std::cout << "Received indices - player:" << playerIndex 
-                                 << " color:" << colorIndex << std::endl;
-                        #endif
+                        DEBUG_LOG("Received indices - player:%d color:%d", playerIndex, colorIndex);
                     }
                     continue;
                 }
