@@ -78,4 +78,3 @@ This project does not include a graphical interface and uses the terminal to dis
 ## Acknowledgements
 
 Thanks to [Zach Latta](https://github.com/zachlatta) for the inspiration from [sshtron](https://github.com/zachlatta/sshtron).
-Thanks to all open-source projects and tools that supported the development of this project.
