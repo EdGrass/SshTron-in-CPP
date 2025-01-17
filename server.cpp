@@ -16,6 +16,13 @@
 #include <fcntl.h>   // 为 fcntl, F_GETFL, F_SETFL
 #include <errno.h>   // 为 errno
 
+// 在文件开头添加调试输出宏定义
+#ifdef DEBUG_MODE
+#define DEBUG_LOG(msg, ...) printf("[DEBUG] " msg "\n", ##__VA_ARGS__)
+#else
+#define DEBUG_LOG(msg, ...)
+#endif
+
 struct Player {
     int x, y;
     int dx, dy;
@@ -116,23 +123,16 @@ private:
         time_t now = time(nullptr);
         int timeDiff = static_cast<int>(now - player.lastScoreTime);
         
-        #ifdef DEBUG_MODE
-        std::cout << "Updating score for player " << player.playerIndex + 1 
-                  << " time diff: " << timeDiff 
-                  << " last score time: " << player.lastScoreTime 
-                  << " current time: " << now << std::endl;
-        #endif
+        DEBUG_LOG("Updating score for player %d time diff: %d last score time: %ld current time: %ld", 
+                  player.playerIndex + 1, timeDiff, player.lastScoreTime, now);
 
         if (timeDiff > 0) {
             int scoreIncrease = timeDiff * SCORE_SURVIVAL_TIME;
             player.score += scoreIncrease;
             player.lastScoreTime = now;
 
-            #ifdef DEBUG_MODE
-            std::cout << "Player " << player.playerIndex + 1 
-                      << " score increased by " << scoreIncrease 
-                      << " new score: " << player.score << std::endl;
-            #endif
+            DEBUG_LOG("Player %d score increased by %d new score: %d", 
+                      player.playerIndex + 1, scoreIncrease, player.score);
         }
     }
 
@@ -246,11 +246,8 @@ private:
             player.score = 0;  // 确保复活时分数从0开始
             board[y][x] = player.colorIndex + 1;  // 使用颜色索引
 
-            #ifdef DEBUG_MODE
-            std::cout << "Player " << player.playerIndex + 1 
-                      << " (color: " << player.colorIndex + 1 
-                      << ") respawned at position (" << x << "," << y << ")" << std::endl;
-            #endif
+            DEBUG_LOG("Player %d (color: %d) respawned at position (%d,%d)", 
+                      player.playerIndex + 1, player.colorIndex + 1, x, y);
         } catch (const std::runtime_error& e) {
             std::cerr << "Error respawning player " << player.playerIndex + 1 
                       << ": " << e.what() << std::endl;
@@ -352,22 +349,17 @@ private:
 
     // 修改：在现有代码中添加日志
     void debugPrintState() {
-        #ifdef DEBUG_MODE
-        std::cout << "\nCurrent game state:" << std::endl;
-        std::cout << "Used color indices: ";
+        DEBUG_LOG("\nCurrent game state:");
+        DEBUG_LOG("Used color indices: ");
         for (int i = 0; i < MAX_PLAYERS; i++) {
-            std::cout << i << ":" << (usedColorIndices[i] ? "1" : "0") << " ";
+            DEBUG_LOG("%d:%d ", i, usedColorIndices[i] ? 1 : 0);
         }
-        std::cout << "\nPlayers:" << std::endl;
+        DEBUG_LOG("\nPlayers:");
         for (const auto& p : players) {
-            std::cout << "Player " << p.playerIndex 
-                     << " (color:" << p.colorIndex 
-                     << ", socket:" << p.socket
-                     << ", score:" << p.score 
-                     << ")" << std::endl;
+            DEBUG_LOG("Player %d (color:%d, socket:%d, score:%d)", 
+                      p.playerIndex, p.colorIndex, p.socket, p.score);
         }
-        std::cout << std::endl;
-        #endif
+        DEBUG_LOG("");
     }
 
     void initializeNewPlayer(Player& p) {
@@ -419,11 +411,8 @@ public:
                 p.colorIndex = colorIndex;
 
                 // 打印调试信息
-                #ifdef DEBUG_MODE
-                std::cout << "Adding new player - socket:" << socket 
-                         << " playerIndex:" << playerIndex 
-                         << " colorIndex:" << colorIndex << std::endl;
-                #endif
+                DEBUG_LOG("Adding new player - socket:%d playerIndex:%d colorIndex:%d", 
+                         socket, playerIndex, colorIndex);
 
                 // 发送索引信息
                 std::string indexMsg = "INDEX:" + std::to_string(playerIndex) + 
@@ -451,7 +440,7 @@ public:
                 
                 std::cout << "Player " << playerIndex + 1 << " joined the game" << std::endl;
             } catch (const std::runtime_error& e) {
-                std::cerr << "无法添加新玩家: " << e.what() << std::endl;
+                DEBUG_LOG("Failed to add new player: %s", e.what());
                 close(socket);
             }
         }
@@ -468,10 +457,8 @@ public:
         
         Player& player = *it;
         
-        #ifdef DEBUG_MODE
-        std::cout << "Received input from player " << player.playerIndex + 1 
-                  << " (color:" << player.colorIndex << "): " << input << std::endl;
-        #endif
+        DEBUG_LOG("Received input from player %d (color:%d): %c", 
+                  player.playerIndex + 1, player.colorIndex, input);
         
         int newDx = player.dx;
         int newDy = player.dy;
@@ -486,10 +473,8 @@ public:
         if (newDx != player.dx || newDy != player.dy) {
             player.dx = newDx;
             player.dy = newDy;
-            #ifdef DEBUG_MODE
-            std::cout << "Player " << player.playerIndex + 1 
-                      << " direction changed to: (" << player.dx << "," << player.dy << ")" << std::endl;
-            #endif
+            DEBUG_LOG("Player %d direction changed to: (%d,%d)", 
+                      player.playerIndex + 1, player.dx, player.dy);
         }
     }
 
@@ -520,10 +505,8 @@ public:
             [playerIndex](const Player& p) { return p.playerIndex == playerIndex; });
         
         if (it != players.end()) {
-            #ifdef DEBUG_MODE
-            std::cout << "Removing player - index:" << playerIndex 
-                     << " color:" << it->colorIndex << std::endl;
-            #endif
+            DEBUG_LOG("Removing player - index:%d color:%d", 
+                     playerIndex, it->colorIndex);
 
             // 释放颜色索引
             usedColorIndices[it->colorIndex] = false;
@@ -591,11 +574,8 @@ public:
                 int newX = player.x + player.dx;
                 int newY = player.y + player.dy;
 
-                #ifdef DEBUG_MODE
-                std::cout << "Moving player " << player.playerIndex + 1 
-                          << " from (" << player.x << "," << player.y 
-                          << ") to (" << newX << "," << newY << ")" << std::endl;
-                #endif
+                DEBUG_LOG("Moving player %d from (%d,%d) to (%d,%d)", 
+                          player.playerIndex + 1, player.x, player.y, newX, newY);
 
                 Player* killer = nullptr;
                 bool willCollide = checkCollision(newX, newY, player, &killer);
@@ -633,17 +613,13 @@ public:
             std::string state = serializeGameState();
             std::vector<int> failedPlayers;
             
-            #ifdef DEBUG_MODE
-            std::cout << "Game state updated. Active players: ";
+            DEBUG_LOG("Game state updated. Active players: ");
             for (const auto& player : players) {
-                std::cout << "Player " << player.playerIndex + 1 
-                          << "(" << (player.alive ? "alive" : "dead") 
-                          << " at " << player.x << "," << player.y 
-                          << " moving " << player.dx << "," << player.dy 
-                          << ") ";
+                DEBUG_LOG("Player %d(%s at %d,%d moving %d,%d) ", 
+                          player.playerIndex + 1, player.alive ? "alive" : "dead", 
+                          player.x, player.y, player.dx, player.dy);
             }
-            std::cout << std::endl;
-            #endif
+            DEBUG_LOG("");
 
             // 发送状态给所有玩家
             for (const auto& player : players) {
@@ -745,9 +721,7 @@ void handleClient(TronGame& game, int playerIndex) {
             
             // 处理心跳包
             if (buffer[0] == 'h') {
-                #ifdef DEBUG_MODE
-                std::cout << "Heartbeat received from player " << playerIndex + 1 << std::endl;
-                #endif
+                DEBUG_LOG("Heartbeat received from player %d", playerIndex + 1);
                 continue;
             }
             

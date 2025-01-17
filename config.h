@@ -34,7 +34,7 @@
 #define MAX_DATA_BUFFER 16384     // 最大数据缓冲区大小
 
 // 游戏控制
-#define GAME_SPEED_MS 500       // 游戏刷新间隔（毫秒）
+#define GAME_SPEED_MS 300       // 游戏刷新间隔（毫秒）
 #define RESET_DELAY_MS 3000     // 重置游戏延迟（毫秒）
 #define EMPTY_CELL ' '     // 空白区域字符
 
@@ -104,7 +104,7 @@
 #define ERROR_TIMEOUT -3
 
 // 游戏界面相关定义
-#define GAME_TITLE L"SSH TRON but with C++"
+#define GAME_TITLE L"TronGame with cpp"
 #define GAME_HEADER_FORMAT "Score:%d | Your High Score:%d | Game High Score:%d "
 #define GAME_FOOTER "Warning: Other Players Must be in This Game for You to Score!"
 #define PLAYER_NAME_MAX_LENGTH 20
