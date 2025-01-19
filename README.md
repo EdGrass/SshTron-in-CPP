@@ -1,7 +1,7 @@
 # TronGame with cpp
 
 ## Project Overview
-TronGame is a multiplayer real-time game based on the classic game "Tron," allowing multiple players to participate through network connections. The game involves players controlling their "light trails" on a grid and colliding with other players' trails to eliminate them. Each player controls a light ball and needs to change the movement direction by inputting commands to avoid hitting other players' trails or boundaries. The project includes both server and client parts.
+TronGame is a multiplayer real-time game based on the terminal, where players control the movement of the light ball through keyboard input. The game interface is displayed via text, and it doesn't rely on a graphical user interface. This allows the game to run in a **command-line** environment and enables real-time multiplayer interactions over the network. Inspired by the classic game "Tron," it allows multiple players to participate via network connections. In the game, players control their "light trails" on a grid, colliding with other players' trails to eliminate them. Each player controls a light ball and needs to change its movement direction by inputting commands to avoid hitting other players' trails or boundaries. The project includes both server and client parts.
 
 Here is a screenshot of my game running:
 ![](https://s2.loli.net/2025/01/17/UaFogqOIjxB5skS.jpg)
@@ -15,13 +15,15 @@ Here is a screenshot of my game running:
 - **Server**: Provides game logic, player connections, and management.
 
 ## Environment
-- **Operating System**: Supports Linux and macOS.
-- **Compiler**: Uses g++ compiler, supporting C++17 standard.
+- **Operating System**: Supports macOS and Unix/Linux.
+- **Compiler**: Uses g++ compiler, supporting C++11 standard.
 - **Dependencies**:
 	- `<sys/socket.h>`: For network communication.
 	- `<fcntl.h>`: For controlling non-blocking sockets.
 	- `<termios.h>`: For handling terminal input.
 	- `<unistd.h>`: For file descriptor operations.
+	- `<sys/select.h>`: For using the select() system call, allowing multiplexed I/O operations (to monitor multiple file descriptors).
+	- `<unistd.h>`: For various system-level operations, including file descriptor operations like read(), write(), and close().
 
 
 ## Configuration
@@ -70,10 +72,6 @@ Arrow keys: Control the movement direction of the light ball.
 ├── Makefile               # Build file (optional)
 └── README.md              # Project documentation
 ```
-
-## Notes
-Ensure stable network connections when multiple players are connected to avoid packet loss or latency affecting the game experience.
-This project does not include a graphical interface and uses the terminal to display game content and accept player input.
 
 ## Acknowledgements
 
