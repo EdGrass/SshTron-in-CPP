@@ -59,9 +59,9 @@ The client will connect to the specified server, and players can control the lig
 
 ## Game Controls
 
-Arrow keys: Control the movement direction of the light ball.
+- "WSAD" keys: Control the movement direction of the light ball.
 
-'q' key: Exit the game.
+- 'Q' key: Exit the game.
 
 ## Project Structure
 ```bash
