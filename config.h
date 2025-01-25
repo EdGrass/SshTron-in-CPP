@@ -85,7 +85,7 @@
 #define ERROR_CONNECTION_LOST -2
 #define ERROR_TIMEOUT -3
 
-#define GAME_TITLE L"TronGame with cpp"
+#define GAME_TITLE L"Welcome to TronGame"
 #define GAME_HEADER_FORMAT "Score:%d | Your High Score:%d | Game High Score:%d "
 #define GAME_FOOTER "Warning: Other Players Must be in This Game for You to Score!"
 #define PLAYER_NAME_MAX_LENGTH 20
