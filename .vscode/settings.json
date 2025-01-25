@@ -39,6 +39,25 @@
 		"vector": "cpp",
 		"memory": "cpp",
 		"optional": "cpp",
-		"algorithm": "cpp"
+		"algorithm": "cpp",
+		"random": "cpp",
+		"codecvt": "cpp",
+		"cstdarg": "cpp",
+		"fstream": "cpp",
+		"__hash_table": "cpp",
+		"array": "cpp",
+		"cctype": "cpp",
+		"clocale": "cpp",
+		"complex": "cpp",
+		"cwchar": "cpp",
+		"cwctype": "cpp",
+		"deque": "cpp",
+		"execution": "cpp",
+		"iomanip": "cpp",
+		"queue": "cpp",
+		"sstream": "cpp",
+		"stack": "cpp",
+		"unordered_map": "cpp",
+		"variant": "cpp"
 	}
 }
