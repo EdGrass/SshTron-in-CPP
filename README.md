@@ -1,78 +1,111 @@
-# TronGame with cpp
+# TronGame with C++
 
-## Project Overview
-TronGame is a multiplayer real-time game based on the terminal, where players control the movement of the light ball through keyboard input. The game interface is displayed via text, and it doesn't rely on a graphical user interface. This allows the game to run in a **command-line** environment and enables real-time multiplayer interactions over the network. Inspired by the classic game "Tron," it allows multiple players to participate via network connections. In the game, players control their "light trails" on a grid, colliding with other players' trails to eliminate them. Each player controls a light ball and needs to change its movement direction by inputting commands to avoid hitting other players' trails or boundaries. The project includes both server and client parts.
+---
 
-Here is a screenshot of my game running:
-![](https://i.imgur.com/xsMPJzQ.jpeg)
+**TronGame** 是一款基于终端的 **多人实时游戏**，灵感来源于经典游戏 "Tron"。玩家通过键盘输入控制光球的移动，游戏通过文本界面展示，而无需图形用户界面，因此可以在 **命令行** 环境下运行。游戏支持 **实时多人互动**，玩家通过网络连接参与。每个玩家控制一个光球，移动时会留下光轨，撞到其他玩家的光轨则被淘汰。玩家的目标是生存并尽可能长时间地避免撞到障碍物或其他玩家的光轨。
 
-## Features
-- **Multiplayer**: Supports multiple players playing the game simultaneously.
-- **Light Trail Mechanism**: Players control light balls moving on the grid, leaving light trails. Other players will be eliminated if they hit the trails.
-- **Scoring System**: Players earn points based on survival time and eliminating other players.
-- **Player Management**: Each player has unique information such as color, score, and high score.
-- **Real-time Updates**: The game state is updated in real-time and sent to all connected clients via the network.
-- **Server**: Provides game logic, player connections, and management.
+游戏项目包括 **服务器** 和 **客户端** 部分，提供了完整的多人对战体验。
 
-## Environment
-- **Operating System**: Supports macOS and Unix/Linux.
-- **Compiler**: Uses g++ compiler, supporting C++11 standard.
-- **Dependencies**:
-	- `<sys/socket.h>`: For network communication.
-	- `<fcntl.h>`: For controlling non-blocking sockets.
-	- `<termios.h>`: For handling terminal input.
-	- `<unistd.h>`: For file descriptor operations.
-	- `<sys/select.h>`: For using the select() system call, allowing multiplexed I/O operations (to monitor multiple file descriptors).
-	- `<unistd.h>`: For various system-level operations, including file descriptor operations like read(), write(), and close().
+> **游戏截图**  
+> ![](https://i.imgur.com/xsMPJzQ.jpeg)
 
+---
 
-## Configuration
-1. Configure the server IP address and port number in `config.h`:
-	 ```cpp
-	 #define SERVER_IP "127.0.0.1"  // Server IP address
-	 #define SERVER_PORT 8080      // Server port
-	 ```
-2. Configure other parameters such as the maximum number of players, game board width, and height.
+## 🚀 功能亮点
 
+- **🎮 多人游戏**：支持多名玩家同时在线游玩。
+- **💡 光轨机制**：玩家控制光球移动，留下一条光轨，其他玩家撞到光轨即被淘汰。
+- **🏆 得分系统**：玩家根据存活时间和淘汰其他玩家获得积分。
+- **👥 玩家管理**：每个玩家有独立的颜色、分数和最高分等信息。
+- **🔄 实时更新**：游戏状态实时更新并通过网络同步到所有连接的客户端。
+- **🖥️ 服务器端**：提供游戏逻辑、玩家连接和管理功能。
 
-## Compilation and Build
-Navigate to the project directory and compile using the following command:
+---
+
+## 🛠️ 环境要求
+
+- **操作系统**：macOS 和 Unix/Linux（支持）。
+- **编译器**：使用 **g++** 编译器，支持 **C++11** 标准。
+- **依赖库**：
+  - `<sys/socket.h>`：网络通信。
+  - `<fcntl.h>`：控制非阻塞套接字。
+  - `<termios.h>`：终端输入处理。
+  - `<unistd.h>`：文件描述符操作。
+  - `<sys/select.h>`：多路复用 I/O 操作（监控多个文件描述符）。
+  - `<unistd.h>`：系统级操作（`read()`、`write()`、`close()` 等）。
+
+---
+
+## ⚙️ 配置
+
+1. **配置服务器 IP 地址和端口号**  
+   在 `config.h` 文件中，设置服务器的 IP 地址和端口号：
+
+   ```cpp
+   #define SERVER_IP "127.0.0.1"  // 服务器 IP 地址
+   #define SERVER_PORT 8080      // 服务器端口
+   ```
+
+2. **配置其他参数**  
+   你可以调整游戏设置，如最大玩家数量、游戏棋盘的宽度和高度。
+
+---
+
+## 💻 编译与构建
+
+1. 进入项目目录，运行以下命令进行编译：
+
+   ```bash
+   make
+   ```
+
+---
+
+## 🎮 游戏运行
+
+### 1. 启动服务器
+
+在服务器机器上，运行以下命令启动服务器：
 
 ```bash
-make
-```
-
-## Running the Game
-
-1. Run the Server
-On the server machine, run the server:
-```
 ./server
 ```
 
-2. Run the Client
-On the client machine, run the client:
-```
+### 2. 启动客户端
+
+在客户端机器上，运行以下命令启动客户端：
+
+```bash
 ./client
 ```
-The client will connect to the specified server, and players can control the light ball on the game board and compete with other players.
 
-## Game Controls
+客户端将连接到指定的服务器，玩家可以控制光球并与其他玩家竞赛。
 
-- "WSAD" keys: Control the movement direction of the light ball.
+---
 
-- 'Q' key: Exit the game.
+## 🕹️ 游戏控制
 
-## Project Structure
+- **"WSAD"** 键：控制光球的移动方向。
+- **'Q'** 键：退出游戏。
+
+---
+
+## 📂 项目结构
+
+项目结构如下：
+
 ```bash
 .
-├── client.cpp             # Client implementation
-├── server.cpp             # Server implementation
-├── config.h               # Configuration file (IP, port, etc.)
-├── Makefile               # Build file (optional)
-└── README.md              # Project documentation
+├── client.cpp             # 客户端实现
+├── server.cpp             # 服务器实现
+├── config.h               # 配置文件（包含 IP、端口等配置）
+├── Makefile               # 构建文件（可选）
+└── README.md              # 项目文档
 ```
 
-## Acknowledgements
+---
 
-Thanks to [Zach Latta](https://github.com/zachlatta) for the inspiration from [sshtron](https://github.com/zachlatta/sshtron).
+## 🙏 致谢
+
+特别感谢 [Zach Latta](https://github.com/zachlatta) 提供的灵感，尤其是来自 [sshtron](https://github.com/zachlatta/sshtron) 的设计。
+
