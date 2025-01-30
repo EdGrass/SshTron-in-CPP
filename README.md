@@ -6,8 +6,9 @@
 
 游戏项目包括 **服务器** 和 **客户端** 部分，提供了完整的多人对战体验。
 
-> **游戏截图**  
-> ![](https://i.imgur.com/xsMPJzQ.jpeg)
+![](https://i.imgur.com/wgpj9sD.png)
+
+![](https://i.imgur.com/mm4rSVz.png)
 
 ---
 
@@ -47,7 +48,7 @@
    ```
 
 2. **配置其他参数**  
-   你可以调整游戏设置，如最大玩家数量、游戏棋盘的宽度和高度。
+   你可以调整游戏设置，如最大玩家数量、游戏棋盘的宽度和高度、游戏速度等。
 
 ---
 
@@ -105,13 +106,22 @@
 
 ---
 
-## ⚖️ 许可证
+## 📄 许可证
 
-本项目基于 MIT 许可证开源，详见 [LICENSE](LICENSE) 文件。
+本项目采用 MIT 许可证。查看 [LICENSE](LICENSE) 文件了解更多详细信息。
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## 💬 反馈与贡献
+
+如果你在使用过程中遇到任何问题，或者有好的改进建议，请随时通过 **GitHub Issues** 提交反馈，或创建 **Pull Request** 为项目贡献代码！
 
 ---
 
 ## 🙏 致谢
 
-特别感谢 [Zach Latta](https://github.com/zachlatta) 提供的灵感，尤其是来自 [sshtron](https://github.com/zachlatta/sshtron) 的设计。
+特别感谢 [Zach Latta](https://github.com/zachlatta) 提供的灵感，来自 [sshtron](https://github.com/zachlatta/sshtron) 的设计。
 
+---
